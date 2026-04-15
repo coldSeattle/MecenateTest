@@ -20,6 +20,7 @@ React Native приложение для платформы Mecenate (анало
 | WebSocket | Native WebSocket API |
 | Авторизация | UUID v4, генерируется при первом запуске, хранится в SecureStore |
 | Haptics | expo-haptics |
+| Архитектура | **Feature-Sliced Design (FSD)** |
 
 ---
 
@@ -33,7 +34,7 @@ React Native приложение для платформы Mecenate (анало
 - **Платные посты** — `tier: "paid"` показывает размытую обложку с кнопкой «Отправить донат» вместо контента
 - **Оптимистичные лайки** — мгновенное обновление UI с bounce-анимацией, откат при ошибке сети
 - **Скелетоны загрузки** — shimmer-анимация при первом запросе
-- **Состояние ошибки** — полноэкранный экран с иллюстрацией (SVG-маскот) и кнопкой «Повторить»
+- **Состояние ошибки** — полноэкранный экран с SVG-маскотом и кнопкой «Повторить»
 - **Тёмная / светлая тема** — следует системной цветовой схеме
 
 ### Тестовое задание 2 — Детальный экран + реалтайм
@@ -42,11 +43,9 @@ React Native приложение для платформы Mecenate (анало
 - **Экран поста** — полный текст, обложка, автор, лайки/комментарии
 - **Список комментариев** — курсорная пагинация, кнопка «Загрузить ещё»
 - **Поле ввода комментария** — липнет над клавиатурой, мгновенно добавляет комментарий в кэш без перезагрузки
-- **Лайк комментария** — оптимистичный, с анимацией (API не требуется)
-- **Haptic feedback** — тактильный отклик при нажатии лайка
-- **WebSocket** — подключается к `wss://k8s.mectest.ru/test-app/ws` при открытии поста:
-  - `like_updated` → автоматически обновляет счётчик лайков
-  - `comment_added` → автоматически подгружает новые комментарии
+- **Лайк комментария** — оптимистичный UI (API не требуется)
+- **Haptic feedback** — тактильный отклик на лайк поста, лайк комментария, переключение табов, отправку комментария, кнопку «Повторить»
+- **WebSocket** — подключается при открытии поста, `like_updated` обновляет счётчик лайков, `comment_added` подгружает новые комментарии
 
 ---
 
@@ -73,57 +72,58 @@ npx expo start
 
 ---
 
-## Архитектура
+## Архитектура — Feature-Sliced Design
+
+Проект организован по методологии [Feature-Sliced Design](https://feature-sliced.design/).  
+Каждый слой может импортировать только из слоёв **ниже** себя.
 
 ```
-app/
-  _layout.tsx          # Корень: провайдеры (Tamagui, QueryClient, MobX, SafeArea)
-  index.tsx            # Точка входа → FeedScreen
-  post/[id].tsx        # Динамический роут → PostDetailScreen
+app/                        # expo-router: роуты и провайдеры
+  _layout.tsx               # Tamagui + QueryClient + MobX + SafeArea
+  index.tsx                 # → pages/feed
+  post/[id].tsx             # → pages/post-detail
 
 src/
-  api/
-    client.ts          # Axios instance + Bearer-interceptor
-    posts.ts           # Типизированные API-функции (getPosts, getPost, toggleLike, getComments, addComment)
+  shared/                   # Переиспользуемое, без бизнес-логики
+    api/                    # Axios instance + Bearer-interceptor
+    config/                 # Tamagui токены и темы (light/dark)
+    types/                  # Все API-типы (Post, Author, Comment…)
+    ui/                     # Avatar, VerifiedBadge, CommentBadge,
+                            # ExpandableText, MascotError
 
-  components/
-    feed/
-      PostCard.tsx         # Карточка поста в ленте
-      PostCardSkeleton.tsx # Shimmer-скелетон
-      LockedBadge.tsx      # Оверлей платного поста (блюр + кнопка доната)
-      LikeButton.tsx       # Лайк-пилюля с анимацией и haptics
-      CommentBadge.tsx     # Пилюля с счётчиком комментариев
-      ExpandableText.tsx   # Текст «Показать ещё» с анимацией раскрытия
-      FeedTabFilter.tsx    # Сегментированный контрол фильтрации
-      FeedEmptyError.tsx   # Полноэкранная ошибка с маскотом
-      FeedListFooter.tsx   # Спиннер в конце списка при загрузке
-    post/
-      CommentItem.tsx      # Строка комментария (аватар + текст + лайк)
-      CommentInput.tsx     # Поле ввода + кнопка отправки
-    ui/
-      Avatar.tsx           # Аватар с fallback-инициалами
-      VerifiedBadge.tsx    # Синяя галочка верификации
-      MascotError.tsx      # SVG-маскот (аксолотль) для экрана ошибки
+  entities/                 # Бизнес-сущности
+    auth/                   # AuthStore — UUID-токен (SecureStore)
+    post/                   # API постов, usePostWebSocket
+    comment/                # API комментариев, useComments,
+                            # CommentItem, CommentInput
 
-  hooks/
-    useFeed.ts             # useInfiniteQuery для ленты с фильтром по tier
-    useComments.ts         # useInfiniteQuery для комментариев поста
-    usePostWebSocket.ts    # WebSocket-хук (like_updated / comment_added)
+  features/                 # Пользовательские действия
+    like-post/              # FeedStore (оптимистичные лайки), LikeButton
+    feed-filter/            # FeedTabFilter (Все / Бесплатные / Платные)
+    locked-post/            # LockedBadge (блюр + кнопка доната)
 
-  screens/
-    FeedScreen.tsx         # Лента: FlatList + табы + pull-to-refresh
-    PostDetailScreen.tsx   # Детальный пост: контент + комментарии + ввод
+  widgets/                  # Самодостаточные крупные блоки
+    post-card/              # PostCard, PostCardSkeleton
+    feed-list/              # useFeed, FeedListFooter, FeedEmptyError
 
-  stores/
-    AuthStore.ts           # UUID-токен: генерация + персистентность (SecureStore)
-    FeedStore.ts           # Оптимистичные лайки: Map<postId, {isLiked, likesCount}>
-    RootStore.ts           # Корневой стор + React Context + хелперы useAuthStore/useFeedStore
+  pages/                    # Экраны (оркестрируют виджеты и фичи)
+    feed/                   # FeedScreen
+    post-detail/            # PostDetailScreen
 
-  types/
-    api.ts                 # Все типы API (Post, Author, Comment, ответы)
-
-tamagui.config.ts          # Дизайн-токены: цвета, отступы, радиусы, темы light/dark
+  app-layer/                # FSD app-слой (не expo-router)
+    providers/              # RootStore — объединяет AuthStore + FeedStore
 ```
+
+### Алиасы
+
+| Алиас | Путь |
+|---|---|
+| `@shared/...` | `src/shared/...` |
+| `@entities/...` | `src/entities/...` |
+| `@features/...` | `src/features/...` |
+| `@widgets/...` | `src/widgets/...` |
+| `@pages/...` | `src/pages/...` |
+| `@app-layer/...` | `src/app-layer/...` |
 
 ### Разделение стейта
 
@@ -131,8 +131,8 @@ tamagui.config.ts          # Дизайн-токены: цвета, отступ
 |---|---|---|
 | Данные с сервера (посты, комментарии) | TanStack Query | Кэш, дедупликация, пагинация, инвалидация |
 | Оптимистичные лайки | MobX FeedStore | Мгновенная реакция UI до ответа сервера |
-| UUID-токен | MobX AuthStore | Доступен глобально без лишних перерендеров |
-| Состояние ввода комментария | локальный useState | Изолированно в компоненте |
+| UUID-токен | MobX AuthStore | Глобальный доступ без лишних перерендеров |
+| Состояние ввода комментария | локальный `useState` | Изолировано в компоненте |
 
 ---
 
