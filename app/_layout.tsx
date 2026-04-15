@@ -6,8 +6,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import config from '../tamagui.config';
-import { StoreProvider, rootStore } from '@/stores/RootStore';
+import tamaguiConfig from '@shared/config/tamagui';
+import { StoreProvider, rootStore } from '@app-layer/providers/RootStore';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,19 +32,13 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <TamaguiProvider config={config} defaultTheme={isDark ? 'dark' : 'light'}>
-          {/* expo-status-bar автоматически выбирает dark/light контент по теме */}
+        <TamaguiProvider config={tamaguiConfig} defaultTheme={isDark ? 'dark' : 'light'}>
           <StatusBar style={isDark ? 'light' : 'dark'} />
           <QueryClientProvider client={queryClient}>
             <StoreProvider value={rootStore}>
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="index" />
-                <Stack.Screen
-                  name="post/[id]"
-                  options={{
-                    animation: 'slide_from_right',
-                  }}
-                />
+                <Stack.Screen name="post/[id]" options={{ animation: 'slide_from_right' }} />
               </Stack>
             </StoreProvider>
           </QueryClientProvider>

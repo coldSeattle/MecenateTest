@@ -1,6 +1,3 @@
-import React from 'react';
-import { FeedScreen } from '@/screens/FeedScreen';
+import { FeedScreen } from '@pages/feed';
 
-export default function Index() {
-  return <FeedScreen />;
-}
+export default FeedScreen;

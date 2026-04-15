@@ -9,6 +9,12 @@ module.exports = function (api) {
           root: ['./'],
           alias: {
             '@': './src',
+            '@shared': './src/shared',
+            '@entities': './src/entities',
+            '@features': './src/features',
+            '@widgets': './src/widgets',
+            '@pages': './src/pages',
+            '@app-layer': './src/app-layer',
           },
         },
       ],
